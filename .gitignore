@@ -17,5 +17,4 @@ web/.env.local
 ~$*
 doc pro/
 logo.png
-prisma/
 railway.json
