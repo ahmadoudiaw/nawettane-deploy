@@ -7,10 +7,13 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   const port = Number(process.env.PORT ?? 3000);
 
-  const rawOrigin = process.env.CORS_ORIGIN;
-  const corsOrigin: string | string[] | boolean = rawOrigin
-    ? rawOrigin.split(',').map((o) => o.trim())
-    : true;
+  const rawOrigin = process.env.CORS_ORIGIN?.trim();
+  const corsOrigins = rawOrigin
+    ? rawOrigin.split(',').map((o) => o.trim()).filter(Boolean)
+    : [];
+  // Use true (allow all) when not configured or set to the literal string "true"
+  const corsOrigin: string | string[] | boolean =
+    corsOrigins.length === 0 || corsOrigins[0] === 'true' ? true : corsOrigins;
 
   app.enableCors({
     origin: corsOrigin,
