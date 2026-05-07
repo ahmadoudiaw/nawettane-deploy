@@ -23,6 +23,8 @@ class MyTicketsScreen extends StatefulWidget {
 
 class _MyTicketsScreenState extends State<MyTicketsScreen> {
   TicketWalletController? _controller;
+  final _phoneController = TextEditingController();
+  bool _recoveryExpanded = false;
 
   @override
   void didChangeDependencies() {
@@ -34,7 +36,15 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
   @override
   void dispose() {
     _controller?.dispose();
+    _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _recover() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    await _controller?.recoverByPhone(phone);
   }
 
   @override
@@ -48,6 +58,8 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
       child: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
+          final recoverySection = _buildRecoverySection(context, controller);
+
           return RefreshIndicator(
             onRefresh: controller.load,
             child: ListView(
@@ -64,7 +76,7 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                   ))
                 else if (controller.error != null)
                   Text(controller.error!)
-                else if (controller.tickets.isEmpty)
+                else if (controller.tickets.isEmpty) ...[
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
@@ -80,8 +92,10 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                         ],
                       ),
                     ),
-                  )
-                else
+                  ),
+                  const SizedBox(height: 16),
+                  recoverySection,
+                ] else ...[
                   ...controller.tickets.map(
                     (ticket) => Padding(
                       padding: const EdgeInsets.only(bottom: 14),
@@ -119,10 +133,100 @@ class _MyTicketsScreenState extends State<MyTicketsScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  recoverySection,
+                ],
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildRecoverySection(BuildContext context, TicketWalletController controller) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => setState(() => _recoveryExpanded = !_recoveryExpanded),
+              child: Row(
+                children: [
+                  const Icon(Icons.phone_android, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Récupérer mes billets par téléphone',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  Icon(_recoveryExpanded ? Icons.expand_less : Icons.expand_more),
+                ],
+              ),
+            ),
+            if (_recoveryExpanded) ...[
+              const SizedBox(height: 14),
+              Text(
+                'Entrez le numéro utilisé lors de l\'achat pour retrouver vos billets sur ce téléphone.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Numéro de téléphone',
+                  hintText: 'ex: 77 123 45 67',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone),
+                  isDense: true,
+                ),
+                onSubmitted: (_) => _recover(),
+              ),
+              const SizedBox(height: 10),
+              if (controller.recoveryError != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    controller.recoveryError!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                  ),
+                ),
+              if (controller.recoveryCount != null && !controller.isRecovering)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    controller.recoveryCount == 0
+                        ? 'Aucun billet trouvé pour ce numéro.'
+                        : '${controller.recoveryCount} billet(s) récupéré(s) avec succès.',
+                    style: TextStyle(
+                      color: controller.recoveryCount == 0 ? Colors.orange : Colors.green,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: controller.isRecovering ? null : _recover,
+                  icon: controller.isRecovering
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.search),
+                  label: Text(controller.isRecovering ? 'Recherche...' : 'Récupérer'),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

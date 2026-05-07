@@ -1,4 +1,5 @@
 import { PageShell } from '@/components/page-shell';
+import { QrCode } from '@/components/qr-code';
 import { getTicket } from '@/lib/api';
 import { formatCurrency, formatDate } from '@/lib/format';
 
@@ -62,11 +63,12 @@ export default async function TicketPage({
         </section>
 
         <aside className="panel stack ticket-qr-panel">
-          <div className="card">
+          <div className="card" style={{ alignItems: 'center', textAlign: 'center' }}>
             <h3>QR de démo</h3>
-            <div className="qr-placeholder">
+            <QrCode value={ticket.qrPayload ?? ticket.ticketCode} size={200} />
+            <p className="muted" style={{ marginTop: '12px', fontSize: '0.75rem', wordBreak: 'break-all' }}>
               {ticket.ticketCode}
-            </div>
+            </p>
           </div>
         </aside>
       </div>

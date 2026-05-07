@@ -20,6 +20,9 @@ export default function AppSettingsPage() {
   const [contactPhone, setContactPhone] = useState('');
   const [developerName, setDeveloperName] = useState('');
   const [developerWebsite, setDeveloperWebsite] = useState('');
+  const [appDownloadAndroidUrl, setAppDownloadAndroidUrl] = useState('');
+  const [appDownloadIosUrl, setAppDownloadIosUrl] = useState('');
+  const [appDownloadHelpText, setAppDownloadHelpText] = useState('');
 
   useEffect(() => {
     const s = getSession();
@@ -32,6 +35,9 @@ export default function AppSettingsPage() {
         setContactPhone(data.contactPhone);
         setDeveloperName(data.developerName);
         setDeveloperWebsite(data.developerWebsite);
+        setAppDownloadAndroidUrl(data.appDownloadAndroidUrl ?? '');
+        setAppDownloadIosUrl(data.appDownloadIosUrl ?? '');
+        setAppDownloadHelpText(data.appDownloadHelpText ?? '');
       })
       .catch((err) => {
         if (err instanceof ApiError && err.globallyHandled) return;
@@ -51,6 +57,9 @@ export default function AppSettingsPage() {
         contactPhone: contactPhone.trim(),
         developerName: developerName.trim(),
         developerWebsite: developerWebsite.trim(),
+        appDownloadAndroidUrl: appDownloadAndroidUrl.trim(),
+        appDownloadIosUrl: appDownloadIosUrl.trim(),
+        appDownloadHelpText: appDownloadHelpText.trim(),
       });
       setSettings(updated);
       toast.success('Paramètres application enregistrés.');
@@ -62,11 +71,31 @@ export default function AppSettingsPage() {
     }
   }
 
+  function handleReset() {
+    if (!settings) return;
+    setApplicationTitle(settings.applicationTitle);
+    setContactLabel(settings.contactLabel);
+    setContactPhone(settings.contactPhone);
+    setDeveloperName(settings.developerName);
+    setDeveloperWebsite(settings.developerWebsite);
+    setAppDownloadAndroidUrl(settings.appDownloadAndroidUrl ?? '');
+    setAppDownloadIosUrl(settings.appDownloadIosUrl ?? '');
+    setAppDownloadHelpText(settings.appDownloadHelpText ?? '');
+  }
+
+  function handleTestLink(url: string, label: string) {
+    if (!url.trim()) {
+      toast.error('Lien vide', `Le lien ${label} n'est pas renseigné.`);
+      return;
+    }
+    window.open(url.trim(), '_blank', 'noopener,noreferrer');
+  }
+
   return (
     <PageShell
       eyebrow="Administration · Paramètres"
       title="Application mobile"
-      description="Textes affichés dans l'écran Contact de l'application mobile Supporter et Agent."
+      description="Textes et liens de téléchargement affichés dans les applications et sur le Web Buyer."
     >
       <SuperAdminGuard>
         <AdminNav />
@@ -146,6 +175,77 @@ export default function AppSettingsPage() {
                 </div>
               </div>
 
+              {/* ── Liens de téléchargement ── */}
+              <div style={{ borderTop: '1px solid var(--line)', paddingTop: 24, marginTop: 8 }}>
+                <h4 style={{ margin: '0 0 4px' }}>Liens de téléchargement</h4>
+                <p className="muted" style={{ margin: '0 0 20px', fontSize: '0.9rem' }}>
+                  Ces liens alimentent la modale &ldquo;Télécharger l&apos;application&rdquo; sur le Web Buyer.
+                  Laissez vide si l&apos;application n&apos;est pas encore publiée.
+                </p>
+
+                <div className="form__grid">
+                  <div className="field">
+                    <label htmlFor="appDownloadAndroidUrl">Lien Android (Google Drive / Play Store)</label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        id="appDownloadAndroidUrl"
+                        type="url"
+                        value={appDownloadAndroidUrl}
+                        onChange={(e) => setAppDownloadAndroidUrl(e.target.value)}
+                        placeholder="https://drive.google.com/..."
+                        maxLength={500}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        className="button button--secondary"
+                        onClick={() => handleTestLink(appDownloadAndroidUrl, 'Android')}
+                        title="Tester le lien Android"
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        Tester ↗
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="appDownloadIosUrl">Lien iPhone (App Store / TestFlight)</label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        id="appDownloadIosUrl"
+                        type="url"
+                        value={appDownloadIosUrl}
+                        onChange={(e) => setAppDownloadIosUrl(e.target.value)}
+                        placeholder="https://apps.apple.com/..."
+                        maxLength={500}
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        className="button button--secondary"
+                        onClick={() => handleTestLink(appDownloadIosUrl, 'iPhone')}
+                        title="Tester le lien iPhone"
+                        style={{ whiteSpace: 'nowrap' }}
+                      >
+                        Tester ↗
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="field" style={{ gridColumn: '1 / -1' }}>
+                    <label htmlFor="appDownloadHelpText">Texte d&apos;aide (optionnel)</label>
+                    <input
+                      id="appDownloadHelpText"
+                      type="text"
+                      value={appDownloadHelpText}
+                      onChange={(e) => setAppDownloadHelpText(e.target.value)}
+                      placeholder="Ex. Disponible sur Android, iOS bientôt disponible."
+                      maxLength={300}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="button-row" style={{ marginTop: 16 }}>
                 <button
                   className="button button--primary"
@@ -153,6 +253,14 @@ export default function AppSettingsPage() {
                   disabled={loading}
                 >
                   {loading ? 'Enregistrement…' : 'Enregistrer'}
+                </button>
+                <button
+                  className="button button--secondary"
+                  type="button"
+                  onClick={handleReset}
+                  disabled={loading}
+                >
+                  Réinitialiser
                 </button>
               </div>
             </form>

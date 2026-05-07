@@ -31,5 +31,27 @@ class TicketWalletController extends ChangeNotifier {
     await _repository.saveTicketIds(ticketIds);
     await load();
   }
+
+  bool isRecovering = false;
+  String? recoveryError;
+  int? recoveryCount;
+
+  Future<void> recoverByPhone(String phone) async {
+    isRecovering = true;
+    recoveryError = null;
+    recoveryCount = null;
+    notifyListeners();
+
+    try {
+      final found = await _repository.fetchByPhone(phone);
+      recoveryCount = found.length;
+      await load();
+    } catch (e) {
+      recoveryError = e.toString();
+    } finally {
+      isRecovering = false;
+      notifyListeners();
+    }
+  }
 }
 

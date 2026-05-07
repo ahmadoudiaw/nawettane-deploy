@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Match } from '@/lib/types';
 import { formatCurrency, formatDate } from '@/lib/format';
+import { BuyButton } from './buy-button';
 
 export function MatchCard({ match, admin = false }: { match: Match; admin?: boolean }) {
   const detailHref = admin ? `/admin/matches/${match.id}` : `/matches/${match.id}`;
@@ -34,11 +35,7 @@ export function MatchCard({ match, admin = false }: { match: Match; admin?: bool
         <Link className="button button--primary" href={detailHref}>
           Voir le match
         </Link>
-        {!admin ? (
-          <Link className="button button--secondary" href={`/checkout/${match.id}`}>
-            Acheter
-          </Link>
-        ) : null}
+        {!admin ? <BuyButton matchId={match.id} /> : null}
       </div>
     </article>
   );

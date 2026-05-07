@@ -835,6 +835,10 @@ export async function importTeams(token: string, file: File): Promise<ImportResu
 
 // ─── Settings — App settings ─────────────────────────────────────────────
 
+export async function getPublicAppSettings(): Promise<AppSettings> {
+  return apiRequest<AppSettings>('/public/app-settings');
+}
+
 export async function getAppSettings(token: string): Promise<AppSettings> {
   return apiRequest<AppSettings>('/admin/settings/app', { token });
 }

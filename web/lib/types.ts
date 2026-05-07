@@ -248,6 +248,9 @@ export interface AppSettings {
   contactPhone: string;
   developerName: string;
   developerWebsite: string;
+  appDownloadAndroidUrl: string | null;
+  appDownloadIosUrl: string | null;
+  appDownloadHelpText: string | null;
 }
 
 export interface PaymentConfig {

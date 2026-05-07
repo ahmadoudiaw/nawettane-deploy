@@ -43,5 +43,18 @@ class TicketWalletRepository {
       parser: (json) => TicketModel.fromJson(json as Map<String, dynamic>),
     );
   }
+
+  Future<List<TicketModel>> fetchByPhone(String phone) async {
+    final tickets = await _apiClient.get<List<TicketModel>>(
+      '/tickets/by-phone?phone=${Uri.encodeComponent(phone)}',
+      parser: (json) => (json as List<dynamic>)
+          .map((e) => TicketModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+    if (tickets.isNotEmpty) {
+      await saveTicketIds(tickets.map((t) => t.id).toList());
+    }
+    return tickets;
+  }
 }
 
