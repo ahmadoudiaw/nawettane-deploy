@@ -10,8 +10,12 @@ export const metadata: Metadata = {
   title: 'NAWETTANE Demo',
   description: 'Billetterie digitale et pilotage Nawettane.',
   icons: {
-    icon: '/logo.png',
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/logo.png', type: 'image/png' },
+    ],
     apple: '/logo.png',
+    shortcut: '/favicon.ico',
   },
   appleWebApp: {
     capable: true,

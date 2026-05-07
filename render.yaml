@@ -1,0 +1,42 @@
+services:
+  # ── Backend API ────────────────────────────────────────────────────────────
+  - type: web
+    name: nawettane-deploy
+    env: node
+    rootDir: backend
+    buildCommand: npm install && npm run prisma:generate && npm run build
+    startCommand: npm run start:prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false          # set manually in Render dashboard
+      - key: JWT_SECRET
+        sync: false          # set manually in Render dashboard
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: CORS_ORIGIN
+        # Set to the exact URL of the web service, e.g.:
+        # https://nawettane-web.onrender.com
+        sync: false
+
+  # ── Web Buyer / Admin (Next.js) ────────────────────────────────────────────
+  - type: web
+    name: nawettane-web
+    env: node
+    rootDir: web
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Baked at build time — must match the backend API URL above
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://nawettane-deploy.onrender.com/api
+      # Public demo account credentials (read-only, non-admin)
+      - key: NAWETTANE_PUBLIC_EMAIL
+        sync: false          # set manually if different from default
+      - key: NAWETTANE_PUBLIC_PASSWORD
+        sync: false          # set manually if different from default

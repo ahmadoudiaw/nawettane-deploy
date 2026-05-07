@@ -8,7 +8,7 @@ dist/
 backend/.env
 web/.env.local
 .env.local
-.env.production
+backend/.env.production
 *.log
 .idea/
 *.pdf
@@ -16,5 +16,5 @@ web/.env.local
 *.docx
 ~$*
 doc pro/
-logo.png
+/logo.png
 railway.json
