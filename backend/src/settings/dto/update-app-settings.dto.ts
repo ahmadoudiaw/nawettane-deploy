@@ -25,4 +25,19 @@ export class UpdateAppSettingsDto {
   @IsString()
   @MaxLength(200)
   developerWebsite?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  appDownloadAndroidUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  appDownloadIosUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  appDownloadHelpText?: string;
 }

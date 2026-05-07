@@ -485,14 +485,17 @@ model PaymentConfig {
 }
 
 model AppSettings {
-  id               String   @id @default(cuid())
-  applicationTitle String   @default("Nawettane : Système de Billetterie digitale")
-  contactLabel     String   @default("Contact :")
-  contactPhone     String   @default("Téléphone :")
-  developerName    String   @default("DICOTECH")
-  developerWebsite String   @default("Site web :")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  applicationTitle      String   @default("Nawettane : Système de Billetterie digitale")
+  contactLabel          String   @default("Contact :")
+  contactPhone          String   @default("Téléphone :")
+  developerName         String   @default("DICOTECH")
+  developerWebsite      String   @default("Site web :")
+  appDownloadAndroidUrl String?
+  appDownloadIosUrl     String?
+  appDownloadHelpText   String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   @@map("app_settings")
 }

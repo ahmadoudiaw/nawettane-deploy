@@ -131,6 +131,9 @@ export class SettingsService {
     if (dto.contactPhone !== undefined) data.contactPhone = dto.contactPhone;
     if (dto.developerName !== undefined) data.developerName = dto.developerName;
     if (dto.developerWebsite !== undefined) data.developerWebsite = dto.developerWebsite;
+    if (dto.appDownloadAndroidUrl !== undefined) data.appDownloadAndroidUrl = dto.appDownloadAndroidUrl || null;
+    if (dto.appDownloadIosUrl !== undefined) data.appDownloadIosUrl = dto.appDownloadIosUrl || null;
+    if (dto.appDownloadHelpText !== undefined) data.appDownloadHelpText = dto.appDownloadHelpText || null;
 
     return this.prisma.appSettings.update({
       where: { id: APP_SETTINGS_ID },
