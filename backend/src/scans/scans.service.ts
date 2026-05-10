@@ -40,6 +40,21 @@ export class ScansService {
       );
     }
 
+    if (ticket.status === TicketStatus.CANCELLED) {
+      const scanRecord = await this.createScanResult(
+        ticket.matchId,
+        user.id,
+        ticket.id,
+        ScanResult.INVALID,
+        dto.deviceLabel,
+      );
+      return {
+        ...scanRecord,
+        reason: 'TICKET_CANCELLED' as const,
+        message: 'Ce ticket a été annulé.',
+      };
+    }
+
     if (ticket.status === TicketStatus.USED || ticket.usedAt) {
       return this.createScanResult(
         ticket.matchId,
