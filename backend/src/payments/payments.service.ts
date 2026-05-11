@@ -1,6 +1,8 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -14,9 +16,24 @@ import { MockConfirmPaymentDto } from './dto/mock-confirm-payment.dto';
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async mockConfirm(orderId: string, dto: MockConfirmPaymentDto) {
+    if (process.env.ALLOW_MOCK_PAYMENTS !== 'true') {
+      this.logger.warn(
+        `mock-confirm refusé pour orderId=${orderId} — ALLOW_MOCK_PAYMENTS non activé.`,
+      );
+      throw new ForbiddenException(
+        'Les paiements mock sont désactivés en production. Définir ALLOW_MOCK_PAYMENTS=true en développement uniquement.',
+      );
+    }
+
+    this.logger.log(
+      `[MOCK] Confirmation paiement → orderId=${orderId} provider=${dto.provider}`,
+    );
+
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: {
@@ -31,6 +48,7 @@ export class PaymentsService {
     }
 
     if (order.status === OrderStatus.PAID) {
+      this.logger.log(`[MOCK] Commande ${orderId} déjà payée — retour immédiat.`);
       return order;
     }
 
@@ -73,35 +91,24 @@ export class PaymentsService {
       await tx.payment.updateMany({
         where: {
           orderId,
-          id: {
-            not: payment.id,
-          },
+          id: { not: payment.id },
           status: PaymentStatus.PENDING,
         },
-        data: {
-          status: PaymentStatus.CANCELLED,
-        },
+        data: { status: PaymentStatus.CANCELLED },
       });
 
       const updatedOrder = await tx.order.update({
         where: { id: orderId },
-        data: {
-          status: OrderStatus.PAID,
-        },
+        data: { status: OrderStatus.PAID },
       });
 
       await tx.matchTicketCategory.update({
         where: { id: order.ticketCategoryId },
-        data: {
-          soldCount: {
-            increment: updatedOrder.quantity,
-          },
-        },
+        data: { soldCount: { increment: updatedOrder.quantity } },
       });
 
       const ticketsData = Array.from({ length: updatedOrder.quantity }, (_, index) => {
         const ticketCode = `TCK-${updatedOrder.id.toUpperCase()}-${index + 1}`;
-
         return {
           orderId: updatedOrder.id,
           matchId: updatedOrder.matchId,
@@ -119,9 +126,11 @@ export class PaymentsService {
         };
       });
 
-      await tx.ticket.createMany({
-        data: ticketsData,
-      });
+      await tx.ticket.createMany({ data: ticketsData });
+
+      this.logger.log(
+        `[MOCK] ${updatedOrder.quantity} ticket(s) générés pour commande ${orderId}.`,
+      );
 
       const result = await tx.order.findUnique({
         where: { id: orderId },

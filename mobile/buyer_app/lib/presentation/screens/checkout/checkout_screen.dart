@@ -21,7 +21,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   int _quantity = 1;
-  String _provider = 'WAVE_MOCK';
   bool _submitting = false;
   String? _error;
   MatchTicketCategory? _selectedCategory;
@@ -92,22 +91,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   onChanged: (value) => setState(() => _quantity = value ?? 1),
                 ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _provider,
-                  decoration: const InputDecoration(labelText: 'Mode de paiement'),
-                  items: const [
-                    DropdownMenuItem(value: 'WAVE_MOCK', child: Text('Wave')),
-                    DropdownMenuItem(value: 'ORANGE_MONEY_MOCK', child: Text('Orange Money')),
-                  ],
-                  onChanged: (value) => setState(() => _provider = value ?? 'WAVE_MOCK'),
-                ),
               ],
             ),
           ),
           if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: Colors.red)),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Color(0xFFC62828)),
+              ),
+            ),
           ],
           if (selected != null) ...[
             const SizedBox(height: 18),
@@ -125,6 +124,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
             ),
           ],
+          // Indicateur de méthode de paiement
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE3F2FD),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF90CAF9)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.payment, color: Color(0xFF1565C0), size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'Paiement via Wave',
+                  style: TextStyle(
+                    color: Color(0xFF1565C0),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: ColoredBox(
@@ -133,7 +156,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           minimum: const EdgeInsets.fromLTRB(20, 12, 20, 16),
           child: FilledButton(
             onPressed: selected == null || _submitting ? null : _submit,
-            child: Text(_submitting ? 'Traitement...' : 'Confirmer le paiement'),
+            child: Text(_submitting ? 'Traitement...' : 'Payer avec Wave'),
           ),
         ),
       ),
@@ -151,7 +174,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     final scope = BuyerAppScope.of(context);
+
     try {
+      // Étape 1 : créer la commande (statut PENDING)
       final order = await scope.checkoutRepository.createOrder(
         matchId: widget.match.id,
         ticketCategoryId: selected.id,
@@ -161,27 +186,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         quantity: _quantity,
       );
 
-      final tickets = await scope.checkoutRepository.confirmMockPayment(
-        orderId: order.id,
-        provider: _provider,
-      );
-
-      final ids = tickets.map((ticket) => ticket.id).where((id) => id.isNotEmpty).toList();
-      if (ids.isEmpty) {
-        throw ApiException(message: 'Aucun billet généré après le paiement.', statusCode: 500);
-      }
-
-      await scope.ticketWalletRepository.saveTicketIds(ids);
+      // Étape 2 : initier le paiement Wave réel
+      final waveResult = await scope.checkoutRepository.waveInitiate(order.id);
 
       if (!mounted) return;
 
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRouter.ticketDetail,
-        ModalRoute.withName(AppRouter.home),
-        arguments: ids.first,
+      // Étape 3 : naviguer vers l'écran Wave
+      // Cet écran ouvre l'URL Wave dans le navigateur et gère le polling.
+      await Navigator.of(context).pushNamed(
+        AppRouter.wavePayment,
+        arguments: <String, String>{
+          'orderId': order.id,
+          'waveLaunchUrl': waveResult.waveLaunchUrl,
+        },
       );
+
+      // Si l'utilisateur revient sur cet écran (retour arrière depuis l'écran Wave),
+      // on ne fait rien — les tickets sont gérés par WavePaymentScreen.
     } catch (exception) {
-      setState(() => _error = exception.toString());
+      if (!mounted) return;
+      setState(() {
+        _error = exception is ApiException
+            ? exception.message
+            : exception.toString();
+      });
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
