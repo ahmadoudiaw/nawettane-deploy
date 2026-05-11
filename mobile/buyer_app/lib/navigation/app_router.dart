@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../data/models/match.dart';
 import '../presentation/screens/checkout/checkout_screen.dart';
-import '../presentation/screens/checkout/wave_payment_screen.dart';
 import '../presentation/screens/contact_screen.dart';
 import '../presentation/screens/home/home_shell.dart';
 import '../presentation/screens/matches/match_detail_screen.dart';
@@ -16,7 +15,6 @@ class AppRouter {
   static const checkout = '/checkout';
   static const ticketDetail = '/ticket-detail';
   static const contact = '/contact';
-  static const wavePayment = '/wave-payment';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -35,14 +33,6 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => TicketDetailScreen(ticketId: ticketId));
       case contact:
         return MaterialPageRoute(builder: (_) => const ContactScreen());
-      case wavePayment:
-        final args = settings.arguments! as Map<String, String>;
-        return MaterialPageRoute(
-          builder: (_) => WavePaymentScreen(
-            orderId: args['orderId']!,
-            waveLaunchUrl: args['waveLaunchUrl']!,
-          ),
-        );
       default:
         return MaterialPageRoute(
           builder: (_) => const Scaffold(
@@ -52,3 +42,4 @@ class AppRouter {
     }
   }
 }
+
