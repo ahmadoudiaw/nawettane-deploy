@@ -38,8 +38,32 @@ export class WaveService {
       where: { id: PAYMENT_CONFIG_ID },
     });
 
-    if (!config?.waveEnabled || !config.waveApiKey) {
-      throw new BadRequestException('Le paiement Wave n\'est pas configuré.');
+    // ── Diagnostic log : état exact de la config lue en DB ──────────────────
+    this.logger.log(
+      `Wave config DB → ` +
+      `record=${config ? 'trouvé' : 'ABSENT'} ` +
+      `waveEnabled=${config?.waveEnabled ?? 'N/A'} ` +
+      `waveApiKey présente=${!!config?.waveApiKey} (longueur=${config?.waveApiKey?.length ?? 0}) ` +
+      `waveMerchantId présente=${!!config?.waveMerchantId} ` +
+      `mode=${config?.sandbox === false ? 'production' : 'sandbox'}`,
+    );
+
+    if (!config) {
+      throw new BadRequestException(
+        'Configuration paiement introuvable. Initialisez-la depuis Admin → Paramètres → Paiements.',
+      );
+    }
+
+    if (!config.waveEnabled) {
+      throw new BadRequestException(
+        'Wave est désactivé. Activez-le depuis Admin → Paramètres → Paiements.',
+      );
+    }
+
+    if (!config.waveApiKey) {
+      throw new BadRequestException(
+        'Clé API Wave manquante. Saisissez-la dans Admin → Paramètres → Paiements.',
+      );
     }
 
     const amount = Math.round(Number(order.totalAmount)).toString();
@@ -60,7 +84,8 @@ export class WaveService {
     };
 
     this.logger.log(
-      `Wave initiate → orderId=${orderId} ref=${order.reference} amount=${amount} XOF`,
+      `Wave initiate → orderId=${orderId} ref=${order.reference} amount=${amount} XOF ` +
+      `endpoint=${WAVE_API_URL}/checkout/sessions`,
     );
 
     let response: Response;
@@ -87,7 +112,7 @@ export class WaveService {
 
     if (!response.ok) {
       this.logger.error(
-        `Wave API erreur HTTP ${response.status}: ${JSON.stringify(responseData)}`,
+        `Wave API erreur HTTP ${response.status} pour orderId=${orderId}: ${JSON.stringify(responseData)}`,
       );
       throw new BadRequestException(
         `Erreur Wave (${response.status}): ${responseData?.message ?? response.statusText}`,
@@ -95,12 +120,12 @@ export class WaveService {
     }
 
     if (!responseData.wave_launch_url || !responseData.id) {
-      this.logger.error(`Wave API réponse invalide: ${JSON.stringify(responseData)}`);
+      this.logger.error(`Wave API réponse invalide pour orderId=${orderId}: ${JSON.stringify(responseData)}`);
       throw new BadRequestException('Réponse Wave invalide. Contactez le support.');
     }
 
     this.logger.log(
-      `Wave session créée → id=${responseData.id}`,
+      `Wave session créée → id=${responseData.id} orderId=${orderId}`,
     );
 
     // Store session id in the payment record for traceability
