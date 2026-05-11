@@ -71,10 +71,8 @@ export class SettingsService {
       return { ok: false, message: 'Configuration non initialisée.' };
     }
 
-    // L'API Wave Checkout nécessite uniquement waveApiKey (Bearer token).
-    // waveMerchantId est optionnel et non transmis à l'API Wave.
     const waveStatus = config.waveEnabled
-      ? config.waveApiKey
+      ? config.waveApiKey && config.waveMerchantId
         ? 'configured'
         : 'incomplete'
       : 'disabled';
