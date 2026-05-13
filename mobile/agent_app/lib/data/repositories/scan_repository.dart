@@ -1,4 +1,5 @@
 import '../../core/network/api_client.dart';
+import '../models/agent_scan_stats.dart';
 import '../models/scan_result.dart';
 
 class ScanRepository {
@@ -21,6 +22,14 @@ class ScanRepository {
           'deviceLabel': deviceLabel.trim(),
       },
       parser: (json) => ScanValidationResponse.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  Future<AgentScanStats> fetchMyStats({required String matchId}) {
+    return _apiClient.get<AgentScanStats>(
+      '/scan/my-stats/$matchId',
+      authenticated: true,
+      parser: (json) => AgentScanStats.fromJson(json as Map<String, dynamic>),
     );
   }
 }

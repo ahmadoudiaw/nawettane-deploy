@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -21,5 +21,14 @@ export class ScansController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.scansService.validate(dto, user);
+  }
+
+  @Roles(Role.SUPER_ADMIN, Role.ZONE_ADMIN, Role.GUICHET_AGENT)
+  @Get('my-stats/:matchId')
+  async myStats(
+    @Param('matchId') matchId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.scansService.getAgentStats(user.id, matchId);
   }
 }

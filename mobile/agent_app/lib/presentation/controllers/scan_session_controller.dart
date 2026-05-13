@@ -5,11 +5,15 @@ import '../../data/models/scan_result.dart';
 import '../../data/repositories/scan_repository.dart';
 
 class ScanSessionController extends ChangeNotifier {
-  ScanSessionController(this._repository);
+  ScanSessionController(this._repository, {required this.matchId}) {
+    _loadServerStats();
+  }
 
   final ScanRepository _repository;
+  final String matchId;
 
   bool isSubmitting = false;
+  bool isLoadingStats = false;
   String? error;
   ScanValidationResponse? lastResponse;
   int validCount = 0;
@@ -18,6 +22,28 @@ class ScanSessionController extends ChangeNotifier {
   int outOfScopeCount = 0;
 
   final List<ScanHistoryEntry> history = [];
+
+  Future<void> _loadServerStats() async {
+    isLoadingStats = true;
+    notifyListeners();
+    try {
+      debugPrint('[SCAN_STATS] GET /scan/my-stats/$matchId');
+      final stats = await _repository.fetchMyStats(matchId: matchId);
+      validCount = stats.valid;
+      usedCount = stats.alreadyUsed;
+      invalidCount = stats.invalid;
+      outOfScopeCount = stats.outOfScope;
+      debugPrint(
+        '[SCAN_STATS] valid=${stats.valid} alreadyUsed=${stats.alreadyUsed} '
+        'invalid=${stats.invalid} outOfScope=${stats.outOfScope}',
+      );
+    } catch (e) {
+      debugPrint('[SCAN_STATS] erreur chargement stats: $e');
+    } finally {
+      isLoadingStats = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> submit({
     required String ticketCode,
@@ -47,6 +73,7 @@ class ScanSessionController extends ChangeNotifier {
       debugPrint('[SCAN_API] réponse à: ${DateTime.now().toIso8601String()}');
       debugPrint('[SCAN_API] résultat: ${lastResponse!.result} | durée: ${durationMs}ms');
 
+      // Incrément optimiste immédiat pour retour visuel instantané
       _increment(lastResponse!.result);
       history.add(ScanHistoryEntry(
         ticketCode: ticketCode,
@@ -62,6 +89,9 @@ class ScanSessionController extends ChangeNotifier {
       isSubmitting = false;
       notifyListeners();
     }
+
+    // Synchronisation avec le serveur après chaque scan (sans bloquer l'UI)
+    _loadServerStats();
   }
 
   void setLocalError(String message) {
