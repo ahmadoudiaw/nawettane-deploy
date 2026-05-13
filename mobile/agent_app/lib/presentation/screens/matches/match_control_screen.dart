@@ -24,7 +24,10 @@ class _MatchControlScreenState extends State<MatchControlScreen> {
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
-      _scanController = ScanSessionController(AgentAppScope.of(context).scanRepository);
+      _scanController = ScanSessionController(
+        AgentAppScope.of(context).scanRepository,
+        matchId: widget.match.id,
+      );
     }
   }
 
@@ -64,6 +67,30 @@ class _MatchControlScreenState extends State<MatchControlScreen> {
           const SizedBox(height: 8),
           Text('${widget.match.competitionName} · ${widget.match.stage ?? 'Match officiel'}'),
           const SizedBox(height: 18),
+          if (widget.match.isPast)
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8D8D6),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.lock_clock, color: Color(0xFFB4312B)),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      "Match terminé. Le scan de tickets n'est plus autorisé.",
+                      style: TextStyle(
+                        color: Color(0xFFB4312B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -106,13 +133,13 @@ class _MatchControlScreenState extends State<MatchControlScreen> {
                 height: 56,
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: _scanController == null
+                  onPressed: (_scanController == null || widget.match.isPast)
                       ? null
                       : () => Navigator.of(context).pushNamed(AppRouter.scan, arguments: _scanArgs),
                   icon: const Icon(Icons.qr_code_scanner),
-                  label: const Text(
-                    'Validation ticket',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  label: Text(
+                    widget.match.isPast ? 'Scan désactivé (match terminé)' : 'Validation ticket',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),

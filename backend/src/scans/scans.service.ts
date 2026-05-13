@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ScanResult, TicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ValidateScanDto } from './dto/validate-scan.dto';
@@ -7,6 +7,8 @@ import { buildScopeContext } from '../common/utils/scope.util';
 
 @Injectable()
 export class ScansService {
+  private readonly logger = new Logger(ScansService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async validate(dto: ValidateScanDto, user: AuthenticatedUser) {
@@ -21,6 +23,19 @@ export class ScansService {
 
     if (!ticket || ticket.matchId !== dto.matchId) {
       return this.createScanResult(dto.matchId, user.id, null, ScanResult.INVALID, dto.deviceLabel);
+    }
+
+    const matchEndOfDay = new Date(ticket.match.matchDate);
+    matchEndOfDay.setHours(23, 59, 59, 999);
+    if (new Date() > matchEndOfDay) {
+      this.logger.warn(
+        `[SCAN_BLOCKED] matchId=${ticket.matchId} matchDate=${ticket.match.matchDate.toISOString()} agentId=${user.id}`,
+      );
+      return {
+        result: ScanResult.INVALID,
+        reason: 'MATCH_ENDED' as const,
+        message: "Ce match est terminé. Le scan n'est plus autorisé.",
+      };
     }
 
     const scope = user.scope ?? buildScopeContext(user);
@@ -90,6 +105,32 @@ export class ScansService {
         scanId: scan.id,
       };
     });
+  }
+
+  async getAgentStats(agentId: string, matchId: string) {
+    this.logger.log(`[SCAN_STATS] agentId=${agentId} matchId=${matchId}`);
+
+    const [valid, alreadyUsed, invalid, outOfScope] = await Promise.all([
+      this.prisma.ticketScan.count({
+        where: { scannedById: agentId, matchId, scanResult: ScanResult.VALID },
+      }),
+      this.prisma.ticketScan.count({
+        where: { scannedById: agentId, matchId, scanResult: ScanResult.ALREADY_USED },
+      }),
+      this.prisma.ticketScan.count({
+        where: { scannedById: agentId, matchId, scanResult: ScanResult.INVALID },
+      }),
+      this.prisma.ticketScan.count({
+        where: { scannedById: agentId, matchId, scanResult: ScanResult.OUT_OF_SCOPE },
+      }),
+    ]);
+
+    const total = valid + alreadyUsed + invalid + outOfScope;
+    this.logger.log(
+      `[SCAN_STATS] valid=${valid} alreadyUsed=${alreadyUsed} invalid=${invalid} outOfScope=${outOfScope} total=${total}`,
+    );
+
+    return { valid, alreadyUsed, invalid, outOfScope };
   }
 
   private async createScanResult(

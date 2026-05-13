@@ -12,6 +12,9 @@ class AssignedMatchesController extends ChangeNotifier {
   String? error;
   List<MatchModel> matches = [];
 
+  List<MatchModel> get activeMatches => matches.where((m) => !m.isPast).toList();
+  List<MatchModel> get archivedMatches => matches.where((m) => m.isPast).toList();
+
   Future<void> load() async {
     isLoading = true;
     error = null;

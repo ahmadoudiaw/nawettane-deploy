@@ -157,6 +157,7 @@ class _TicketValidationScreenState extends State<TicketValidationScreen> {
                 ResultStateCard(
                   result: _controller.lastResponse?.result,
                   error: _controller.error,
+                  customMessage: _controller.lastResponse?.message,
                   isLoading: _controller.isSubmitting,
                 ),
                 const SizedBox(height: 18),

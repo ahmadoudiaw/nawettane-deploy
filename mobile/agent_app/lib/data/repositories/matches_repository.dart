@@ -7,15 +7,14 @@ class MatchesRepository {
   final ApiClient _apiClient;
 
   Future<List<MatchModel>> getAssignedMatches() {
+    // fromDate=2000-01-01 désactive le filtre automatique "pas de passé" du backend
+    // afin de récupérer tous les matchs PUBLISHED (actifs + archivés) en une seule requête.
     return _apiClient.get<List<MatchModel>>(
-      '/matches',
+      '/matches?status=PUBLISHED&fromDate=2000-01-01',
       authenticated: true,
       parser: (json) {
         final items = (json as List<dynamic>? ?? []).whereType<Map<String, dynamic>>();
-        return items
-            .map(MatchModel.fromJson)
-            .where((match) => match.status == 'PUBLISHED')
-            .toList();
+        return items.map(MatchModel.fromJson).toList();
       },
     );
   }

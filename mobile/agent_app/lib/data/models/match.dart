@@ -27,6 +27,11 @@ class MatchModel {
 
   String get label => '${homeTeam.name} vs ${awayTeam.name}';
 
+  bool get isPast {
+    final endOfDay = DateTime(matchDate.year, matchDate.month, matchDate.day, 23, 59, 59);
+    return DateTime.now().isAfter(endOfDay);
+  }
+
   factory MatchModel.fromJson(Map<String, dynamic> json) {
     return MatchModel(
       id: json['id'] as String? ?? '',

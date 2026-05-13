@@ -7,11 +7,13 @@ class ResultStateCard extends StatelessWidget {
     super.key,
     required this.result,
     required this.error,
+    this.customMessage,
     this.isLoading = false,
   });
 
   final ValidationResult? result;
   final String? error;
+  final String? customMessage;
   final bool isLoading;
 
   @override
@@ -47,7 +49,7 @@ class ResultStateCard extends StatelessWidget {
       );
     }
 
-    final resolved = _resolveState(result, error);
+    final resolved = _resolveState(result, error, customMessage);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -79,7 +81,7 @@ class ResultStateCard extends StatelessWidget {
     );
   }
 
-  _StateVisual _resolveState(ValidationResult? result, String? error) {
+  _StateVisual _resolveState(ValidationResult? result, String? error, String? customMessage) {
     if (error != null) {
       return _StateVisual(
         title: 'ERREUR',
@@ -105,11 +107,11 @@ class ResultStateCard extends StatelessWidget {
           foreground: Color(0xFF9A5A0F),
         );
       case ValidationResult.invalid:
-        return const _StateVisual(
+        return _StateVisual(
           title: 'INVALIDE',
-          message: 'Billet introuvable ou déjà utilisé.',
-          background: Color(0xFFF8D8D6),
-          foreground: Color(0xFFB4312B),
+          message: customMessage ?? 'Billet introuvable ou déjà utilisé.',
+          background: const Color(0xFFF8D8D6),
+          foreground: const Color(0xFFB4312B),
         );
       case ValidationResult.outOfScope:
         return const _StateVisual(
