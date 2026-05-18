@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../../app.dart';
+import '../../../core/offline/connectivity_service.dart';
+import '../../../core/offline/device_id_service.dart';
 import '../../../data/models/scan_result.dart';
 import '../../../navigation/scan_route_args.dart';
 import '../../controllers/scan_session_controller.dart';
@@ -28,14 +31,68 @@ class _TicketValidationScreenState extends State<TicketValidationScreen> {
   bool _scanning = false;
   Timer? _autoScanTimer;
 
+  bool _isSyncing = false;
+  String? _syncMessage;
+  StreamSubscription<bool>? _connectivitySub;
+  bool _cacheIsStale = false;
+
   ScanSessionController get _controller => widget.args.controller;
 
   @override
+  void initState() {
+    super.initState();
+    _connectivitySub = ConnectivityService().statusStream.listen((online) {
+      if (online && mounted) _triggerSync();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkCacheAge());
+  }
+
+  Future<void> _checkCacheAge() async {
+    if (!mounted) return;
+    final stale = await AgentAppScope.of(context).offlineBootstrapService.isCacheStale();
+    if (mounted) setState(() => _cacheIsStale = stale);
+  }
+
+  @override
   void dispose() {
+    _connectivitySub?.cancel();
     _autoScanTimer?.cancel();
     _ticketCodeController.dispose();
     _deviceLabelController.dispose();
     super.dispose();
+  }
+
+  Future<void> _triggerSync() async {
+    if (_isSyncing) return;
+    setState(() {
+      _isSyncing = true;
+      _syncMessage = null;
+    });
+    try {
+      final syncService = AgentAppScope.of(context).offlineSyncService;
+      final result = await syncService.syncPendingScans();
+      if (!mounted) return;
+      final total = result.synced.length + result.conflicts.length + result.rejected.length;
+      if (total == 0) {
+        setState(() => _isSyncing = false);
+        return;
+      }
+      final parts = <String>[];
+      if (result.synced.isNotEmpty) parts.add('${result.synced.length} synchronisé(s)');
+      if (result.conflicts.isNotEmpty) parts.add('${result.conflicts.length} conflit(s)');
+      if (result.rejected.isNotEmpty) parts.add('${result.rejected.length} rejeté(s)');
+      setState(() {
+        _isSyncing = false;
+        _syncMessage = parts.join(', ');
+      });
+    } catch (e) {
+      debugPrint('[OFFLINE_SYNC] erreur: $e');
+      if (!mounted) return;
+      setState(() {
+        _isSyncing = false;
+        _syncMessage = 'Erreur de synchronisation';
+      });
+    }
   }
 
   Future<void> _startScan() async {
@@ -94,8 +151,16 @@ class _TicketValidationScreenState extends State<TicketValidationScreen> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final ticketCode = _ticketCodeController.text.trim().toUpperCase();
+    final isOnline = await ConnectivityService().checkConnectivity();
+
+    if (!isOnline) {
+      await _handleOfflineScan(ticketCode);
+      return;
+    }
+
     await _controller.submit(
-      ticketCode: _ticketCodeController.text.trim().toUpperCase(),
+      ticketCode: ticketCode,
       matchId: widget.args.match.id,
       matchLabel: widget.args.match.label,
       deviceLabel: _deviceLabelController.text.trim(),
@@ -116,6 +181,42 @@ class _TicketValidationScreenState extends State<TicketValidationScreen> {
         baseOffset: 0,
         extentOffset: _ticketCodeController.text.length,
       );
+    }
+  }
+
+  Future<void> _handleOfflineScan(String ticketCode) async {
+    final validator = AgentAppScope.of(context).offlineScanValidatorService;
+    final deviceId = await DeviceIdService.getDeviceId();
+    final validationResult = validator.validate(
+      ticketCode: ticketCode,
+      matchId: widget.args.match.id,
+      deviceId: deviceId,
+    );
+
+    if (validationResult.accepted) {
+      await validator.commitScan(validationResult.offlineScan!);
+    }
+
+    final response = ScanValidationResponse(
+      result: validationResult.validationResult,
+      message: validationResult.message,
+    );
+
+    _controller.recordOfflineResult(
+      ticketCode: ticketCode,
+      matchLabel: widget.args.match.label,
+      response: response,
+    );
+
+    if (!mounted) return;
+
+    if (validationResult.accepted) {
+      HapticFeedback.mediumImpact();
+      _ticketCodeController.clear();
+      _scheduleAutoRescan();
+    } else {
+      HapticFeedback.heavyImpact();
+      Future.delayed(const Duration(milliseconds: 120), HapticFeedback.heavyImpact);
     }
   }
 
@@ -160,6 +261,118 @@ class _TicketValidationScreenState extends State<TicketValidationScreen> {
                   customMessage: _controller.lastResponse?.message,
                   isLoading: _controller.isSubmitting,
                 ),
+                Builder(builder: (ctx) {
+                  final syncService = AgentAppScope.of(ctx).offlineSyncService;
+                  final pending = syncService.pendingCount;
+                  final hasContent = pending > 0 || _syncMessage != null || _cacheIsStale;
+                  if (!hasContent) return const SizedBox.shrink();
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 10),
+                      // Cache stale warning
+                      if (_cacheIsStale)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF0E0),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFB45309)),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Cache hors ligne ancien (>24h). Reproposez le mode hors ligne depuis l\'accueil.',
+                                  style: TextStyle(
+                                    color: Color(0xFFB45309),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      // Pending scans banner
+                      if (pending > 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF3CD),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.cloud_off, size: 16, color: Color(0xFF856404)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '$pending scan(s) hors ligne en attente',
+                                  style: const TextStyle(
+                                    color: Color(0xFF856404),
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              if (_isSyncing)
+                                const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF856404),
+                                  ),
+                                )
+                              else
+                                TextButton(
+                                  onPressed: _triggerSync,
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    foregroundColor: const Color(0xFF856404),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text(
+                                    'Sync',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      // Sync result summary
+                      if (_syncMessage != null)
+                        Container(
+                          margin: const EdgeInsets.only(top: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.cloud_done, size: 16, color: Color(0xFF2E7D32)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _syncMessage!,
+                                  style: const TextStyle(
+                                    color: Color(0xFF2E7D32),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  );
+                }),
                 const SizedBox(height: 18),
                 SizedBox(
                   height: 56,

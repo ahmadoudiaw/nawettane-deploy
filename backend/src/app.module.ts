@@ -24,6 +24,7 @@ import { SettingsModule } from './settings/settings.module';
 import { TerritoriesModule } from './territories/territories.module';
 import { DeletePreviewModule } from './delete-preview/delete-preview.module';
 import { SearchModule } from './search/search.module';
+import { AgentOfflineModule } from './agent-offline/agent-offline.module';
 
 @Module({
   controllers: [HealthController],
@@ -51,6 +52,7 @@ import { SearchModule } from './search/search.module';
     TerritoriesModule,
     DeletePreviewModule,
     SearchModule,
+    AgentOfflineModule,
   ],
   providers: [
     {

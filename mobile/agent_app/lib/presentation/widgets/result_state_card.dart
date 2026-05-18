@@ -93,11 +93,11 @@ class ResultStateCard extends StatelessWidget {
 
     switch (result) {
       case ValidationResult.valid:
-        return const _StateVisual(
+        return _StateVisual(
           title: 'VALIDE',
-          message: 'Billet accepté. Le supporter peut entrer.',
-          background: Color(0xFFDBF4E6),
-          foreground: Color(0xFF0F6C3D),
+          message: customMessage ?? 'Billet accepté. Le supporter peut entrer.',
+          background: const Color(0xFFDBF4E6),
+          foreground: const Color(0xFF0F6C3D),
         );
       case ValidationResult.alreadyUsed:
         return const _StateVisual(

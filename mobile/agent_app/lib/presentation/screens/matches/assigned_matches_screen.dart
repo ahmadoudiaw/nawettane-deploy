@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app.dart';
+import '../../../core/offline/offline_bootstrap_service.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../navigation/app_router.dart';
 import '../../controllers/assigned_matches_controller.dart';
@@ -167,6 +168,8 @@ class _MatchTab extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            const _OfflinePreparationCard(),
+            const SizedBox(height: 16),
           ],
           if (controller.isLoading && matches.isEmpty)
             const Center(
@@ -197,6 +200,234 @@ class _MatchTab extends StatelessWidget {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Offline preparation card ──────────────────────────────────────────────────
+
+class _OfflinePreparationCard extends StatefulWidget {
+  const _OfflinePreparationCard();
+
+  @override
+  State<_OfflinePreparationCard> createState() => _OfflinePreparationCardState();
+}
+
+class _OfflinePreparationCardState extends State<_OfflinePreparationCard> {
+  OfflineBootstrapStatus? _status;
+  bool _loading = false;
+  String? _error;
+  OfflineBootstrapResult? _lastResult;
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      _loadStatus();
+    }
+  }
+
+  Future<void> _loadStatus() async {
+    final status =
+        await AgentAppScope.of(context).offlineBootstrapService.getStatus();
+    if (mounted) setState(() => _status = status);
+  }
+
+  Future<void> _prepare() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _lastResult = null;
+    });
+    try {
+      final result =
+          await AgentAppScope.of(context).offlineBootstrapService.prepare();
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _lastResult = result;
+      });
+      await _loadStatus();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
+    }
+  }
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final isToday =
+        dt.year == now.year && dt.month == now.month && dt.day == now.day;
+    final hm =
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return isToday
+        ? "aujourd'hui à $hm"
+        : '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')} à $hm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _status;
+    final colors = Theme.of(context).colorScheme;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.offline_bolt_outlined, color: colors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Mode hors ligne',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (status == null)
+              const _StatusRow(
+                icon: Icons.hourglass_empty,
+                label: 'Chargement…',
+              )
+            else ...[
+              _StatusRow(
+                icon: Icons.sports_soccer,
+                label: 'Matchs en cache : ${status.matchesCached}',
+              ),
+              const SizedBox(height: 4),
+              _StatusRow(
+                icon: Icons.confirmation_number_outlined,
+                label: 'Tickets en cache : ${status.ticketsCached}',
+              ),
+              const SizedBox(height: 4),
+              _StatusRow(
+                icon: Icons.pending_outlined,
+                label: 'Scans en attente : ${status.pendingScans}',
+              ),
+              const SizedBox(height: 10),
+              Text(
+                status.isPrepared
+                    ? 'Dernière préparation : ${_formatDate(status.lastPreparedAt!)}'
+                    : 'Jamais préparé',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (_lastResult != null) ...[
+              const SizedBox(height: 10),
+              _FeedbackBanner(
+                color: Colors.green,
+                backgroundColor: Colors.green.shade50,
+                icon: Icons.check_circle_outline,
+                message:
+                    'Mode hors ligne prêt — ${_lastResult!.matchesCached} match(s), ${_lastResult!.ticketsCached} ticket(s) en cache',
+              ),
+              if (_lastResult!.ticketFetchErrors > 0) ...[
+                const SizedBox(height: 6),
+                _FeedbackBanner(
+                  color: Colors.orange,
+                  backgroundColor: Colors.orange.shade50,
+                  icon: Icons.warning_amber_outlined,
+                  message:
+                      '${_lastResult!.ticketFetchErrors} match(s) : tickets non récupérés (vérifiez votre connexion)',
+                ),
+              ],
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              _FeedbackBanner(
+                color: Colors.red,
+                backgroundColor: Colors.red.shade50,
+                icon: Icons.error_outline,
+                message: _error!,
+              ),
+            ],
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _loading ? null : _prepare,
+                icon: _loading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.cloud_download_outlined),
+                label: Text(
+                  _loading ? 'Préparation…' : 'Préparer le mode hors ligne',
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusRow extends StatelessWidget {
+  const _StatusRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtle = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: subtle),
+        const SizedBox(width: 6),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+      ],
+    );
+  }
+}
+
+class _FeedbackBanner extends StatelessWidget {
+  const _FeedbackBanner({
+    required this.color,
+    required this.backgroundColor,
+    required this.icon,
+    required this.message,
+  });
+
+  final Color color;
+  final Color backgroundColor;
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: color, fontSize: 13),
+            ),
+          ),
         ],
       ),
     );

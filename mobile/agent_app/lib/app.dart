@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'core/config/app_config.dart';
 import 'core/network/api_client.dart';
+import 'core/offline/connectivity_service.dart';
+import 'core/offline/offline_bootstrap_service.dart';
+import 'core/offline/offline_scan_validator_service.dart';
+import 'core/offline/offline_storage_service.dart';
+import 'core/offline/offline_sync_service.dart';
+import 'core/offline/sync_queue_service.dart';
+import 'data/repositories/offline_ticket_repository.dart';
 import 'core/theme/app_theme.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/matches_repository.dart';
@@ -24,6 +31,12 @@ class _NawettaneAgentAppState extends State<NawettaneAgentApp> {
   late final MatchesRepository _matchesRepository;
   late final ScanRepository _scanRepository;
   late final AuthController _authController;
+  late final OfflineStorageService _offlineStorageService;
+  late final SyncQueueService _syncQueueService;
+  late final OfflineTicketRepository _offlineTicketRepository;
+  late final OfflineBootstrapService _offlineBootstrapService;
+  late final OfflineScanValidatorService _offlineScanValidatorService;
+  late final OfflineSyncService _offlineSyncService;
 
   @override
   void initState() {
@@ -38,6 +51,24 @@ class _NawettaneAgentAppState extends State<NawettaneAgentApp> {
     _matchesRepository = MatchesRepository(_apiClient);
     _scanRepository = ScanRepository(_apiClient);
     _authController = AuthController(_authRepository)..bootstrap();
+    _offlineStorageService = OfflineStorageService();
+    _syncQueueService = SyncQueueService();
+    _offlineTicketRepository = OfflineTicketRepository(_apiClient);
+    _offlineBootstrapService = OfflineBootstrapService(
+      matchesRepository: _matchesRepository,
+      offlineTicketRepository: _offlineTicketRepository,
+      storageService: _offlineStorageService,
+      connectivityService: ConnectivityService(),
+      syncQueueService: _syncQueueService,
+    );
+    _offlineScanValidatorService = OfflineScanValidatorService(
+      storageService: _offlineStorageService,
+      syncQueueService: _syncQueueService,
+    );
+    _offlineSyncService = OfflineSyncService(
+      apiClient: _apiClient,
+      syncQueueService: _syncQueueService,
+    );
   }
 
   @override
@@ -54,6 +85,9 @@ class _NawettaneAgentAppState extends State<NawettaneAgentApp> {
       matchesRepository: _matchesRepository,
       scanRepository: _scanRepository,
       sessionRepository: _sessionRepository,
+      offlineBootstrapService: _offlineBootstrapService,
+      offlineScanValidatorService: _offlineScanValidatorService,
+      offlineSyncService: _offlineSyncService,
       child: MaterialApp(
         title: 'NAWETTANE Agent',
         debugShowCheckedModeBanner: false,
@@ -73,6 +107,9 @@ class AgentAppScope extends InheritedWidget {
     required this.matchesRepository,
     required this.scanRepository,
     required this.sessionRepository,
+    required this.offlineBootstrapService,
+    required this.offlineScanValidatorService,
+    required this.offlineSyncService,
     required super.child,
   });
 
@@ -81,6 +118,9 @@ class AgentAppScope extends InheritedWidget {
   final MatchesRepository matchesRepository;
   final ScanRepository scanRepository;
   final SessionRepository sessionRepository;
+  final OfflineBootstrapService offlineBootstrapService;
+  final OfflineScanValidatorService offlineScanValidatorService;
+  final OfflineSyncService offlineSyncService;
 
   static AgentAppScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AgentAppScope>();

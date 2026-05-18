@@ -20,6 +20,7 @@ class ScanSessionController extends ChangeNotifier {
   int usedCount = 0;
   int invalidCount = 0;
   int outOfScopeCount = 0;
+  int pendingOfflineScans = 0;
 
   final List<ScanHistoryEntry> history = [];
 
@@ -92,6 +93,28 @@ class ScanSessionController extends ChangeNotifier {
 
     // Synchronisation avec le serveur après chaque scan (sans bloquer l'UI)
     _loadServerStats();
+  }
+
+  /// Records an offline scan result in the controller state.
+  /// Does NOT call the API. Called only when the device is offline.
+  void recordOfflineResult({
+    required String ticketCode,
+    required String matchLabel,
+    required ScanValidationResponse response,
+  }) {
+    lastResponse = response;
+    error = null;
+    if (response.result == ValidationResult.valid) {
+      pendingOfflineScans++;
+    }
+    _increment(response.result);
+    history.add(ScanHistoryEntry(
+      ticketCode: ticketCode,
+      result: response.result,
+      scannedAt: DateTime.now(),
+      matchLabel: matchLabel,
+    ));
+    notifyListeners();
   }
 
   void setLocalError(String message) {
